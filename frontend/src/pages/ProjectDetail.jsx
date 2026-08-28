@@ -5,9 +5,11 @@ import { useApp } from "../context/AppContext";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { Sheet, SheetContent, SheetTrigger } from "../components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "../components/ui/dialog";
+import { Textarea } from "../components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
 import DevMentorChat from "../components/DevMentorChat";
-import { Check, HelpCircle, Bug, Star, Trash2, ArrowLeft, MessageCircleQuestion, ChevronRight, Loader2, Target } from "lucide-react";
+import { Check, HelpCircle, Bug, Star, Trash2, ArrowLeft, MessageCircleQuestion, ChevronRight, Loader2, Target, LifeBuoy } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ProjectDetail() {
@@ -18,6 +20,9 @@ export default function ProjectDetail() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [chat, setChat] = useState(null); // { prompt, mode }
   const [loading, setLoading] = useState(true);
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketText, setTicketText] = useState("");
+  const [ticketSending, setTicketSending] = useState(false);
 
   const load = async () => {
     try {
@@ -65,6 +70,22 @@ export default function ProjectDetail() {
     if (mode === "help") prompt = `Preciso de ajuda para continuar nesta etapa: "${step.title}". Objetivo: ${step.objective}`;
     if (mode === "error") prompt = `Estou com um erro nesta etapa: "${step.title}". `;
     setChat({ prompt, mode });
+  };
+
+  const createTicket = async () => {
+    if (!ticketText.trim()) return;
+    setTicketSending(true);
+    try {
+      const r = await api.post("/tickets", { project_id: project.id, step_id: step.id, problem: ticketText });
+      setTicketOpen(false);
+      setTicketText("");
+      toast.success(t("ticketCreated"));
+      nav(`/tickets/${r.data.id}`);
+    } catch {
+      toast.error("Erro");
+    } finally {
+      setTicketSending(false);
+    }
   };
 
   return (
@@ -198,6 +219,32 @@ export default function ProjectDetail() {
                   className="rounded-full h-11 bg-white/5 border-white/10 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-300">
                   <Bug className="w-4 h-4 mr-1.5" /> Está dando erro
                 </Button>
+
+                <Dialog open={ticketOpen} onOpenChange={setTicketOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="btn-ask-human" variant="outline"
+                      className="rounded-full h-11 bg-white/5 border-white/10 hover:bg-amber-400/10 hover:border-amber-400/30 hover:text-amber-300">
+                      <LifeBuoy className="w-4 h-4 mr-1.5" /> {t("askHuman")}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-slate-900 border-white/10">
+                    <DialogHeader>
+                      <DialogTitle>{t("askHuman")}</DialogTitle>
+                      <DialogDescription className="text-slate-400">
+                        {project.name} · {step.title}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Textarea data-testid="ticket-problem-input" value={ticketText} onChange={(e) => setTicketText(e.target.value)}
+                      placeholder={t("describeProblem")} className="bg-slate-950/60 border-white/10 min-h-[120px]" />
+                    <DialogFooter>
+                      <Button variant="ghost" onClick={() => setTicketOpen(false)} className="rounded-full hover:bg-white/5">{t("cancel")}</Button>
+                      <Button data-testid="submit-ticket-btn" onClick={createTicket} disabled={ticketSending || !ticketText.trim()}
+                        className="rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold">
+                        {ticketSending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("createTicket")}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           )}

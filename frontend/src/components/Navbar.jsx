@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { Button } from "./ui/button";
-import { Code2, LayoutDashboard, Sparkles, LogOut, MessageCircleQuestion, Shield } from "lucide-react";
+import { Code2, LayoutDashboard, Sparkles, LogOut, MessageCircleQuestion, Shield, LifeBuoy } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem
 } from "./ui/dropdown-menu";
@@ -17,6 +17,7 @@ export default function Navbar() {
     { to: "/dashboard", label: t("dashboard"), icon: LayoutDashboard, testid: "nav-dashboard" },
     { to: "/explore", label: t("explore"), icon: Sparkles, testid: "nav-explore" },
     { to: "/devmentor", label: t("devmentor"), icon: MessageCircleQuestion, testid: "nav-devmentor" },
+    { to: "/tickets", label: t("helpNav"), icon: LifeBuoy, testid: "nav-tickets" },
   ];
   if (user?.role === "admin") {
     nav.push({ to: "/admin", label: t("adminPanel"), icon: Shield, testid: "nav-admin" });

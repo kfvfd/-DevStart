@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
@@ -31,6 +31,7 @@ ADMIN_NAME = os.environ.get("ADMIN_NAME", "Admin")
 
 # RBAC roles (ordered by privilege for reference; access is checked explicitly, never by index)
 ROLES = ["user", "tester", "collaborator", "moderator", "admin"]
+STAFF_ROLES = {"admin", "moderator", "collaborator"}
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -469,6 +470,144 @@ async def chat_history(project_id: Optional[str] = None, user=Depends(current_us
 @api.get("/")
 async def root():
     return {"ok": True, "name": "DevStart API"}
+
+
+# ---------- Tickets (Help system - Phase 2) ----------
+class TicketCreate(BaseModel):
+    project_id: Optional[str] = None
+    step_id: Optional[str] = None
+    problem: str
+
+
+class TicketMessageIn(BaseModel):
+    content: str
+
+
+class TicketStatusIn(BaseModel):
+    status: Literal["waiting", "in_progress", "resolved"]
+
+
+async def get_ticket_access(tid: str, user):
+    tk = await db.tickets.find_one({"id": tid}, {"_id": 0})
+    if not tk:
+        raise HTTPException(status_code=404, detail="Ticket não encontrado")
+    if tk["user_id"] != user["id"] and user.get("role") not in STAFF_ROLES:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    return tk
+
+
+@api.post("/tickets")
+async def create_ticket(body: TicketCreate, user=Depends(current_user)):
+    project_name, step_title = None, None
+    if body.project_id:
+        p = await db.projects.find_one({"id": body.project_id, "user_id": user["id"]}, {"_id": 0})
+        if p:
+            project_name = p["name"]
+            if body.step_id:
+                for s in p["steps"]:
+                    if s["id"] == body.step_id:
+                        step_title = s["title"]
+                        break
+    tid = str(uuid.uuid4())
+    doc = {
+        "id": tid,
+        "user_id": user["id"],
+        "user_name": user["name"],
+        "project_id": body.project_id,
+        "project_name": project_name,
+        "step_id": body.step_id,
+        "step_title": step_title,
+        "problem": body.problem,
+        "status": "waiting",
+        "assignee_id": None,
+        "assignee_name": None,
+        "rating": None,
+        "good_example": False,
+        "approved": False,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.tickets.insert_one(doc)
+    await db.ticket_messages.insert_one({
+        "id": str(uuid.uuid4()), "ticket_id": tid,
+        "sender_id": user["id"], "sender_name": user["name"], "sender_role": user.get("role", "user"),
+        "content": body.problem, "at": now_iso(),
+    })
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/tickets/mine")
+async def my_tickets(user=Depends(current_user)):
+    return await db.tickets.find({"user_id": user["id"]}, {"_id": 0}).sort("updated_at", -1).to_list(200)
+
+
+@api.get("/tickets/stats")
+async def ticket_stats(staff=Depends(require_staff)):
+    return {
+        "waiting": await db.tickets.count_documents({"status": "waiting"}),
+        "in_progress": await db.tickets.count_documents({"status": "in_progress"}),
+        "resolved": await db.tickets.count_documents({"status": "resolved"}),
+    }
+
+
+@api.get("/tickets")
+async def list_tickets(status_q: Optional[str] = Query(None, alias="status"), mine: bool = False, staff=Depends(require_staff)):
+    q = {}
+    if status_q:
+        q["status"] = status_q
+    if mine:
+        q["assignee_id"] = staff["id"]
+    return await db.tickets.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+
+@api.get("/tickets/{tid}")
+async def get_ticket(tid: str, user=Depends(current_user)):
+    tk = await get_ticket_access(tid, user)
+    msgs = await db.ticket_messages.find({"ticket_id": tid}, {"_id": 0}).sort("at", 1).to_list(1000)
+    return {"ticket": tk, "messages": msgs}
+
+
+@api.post("/tickets/{tid}/messages")
+async def post_ticket_message(tid: str, body: TicketMessageIn, user=Depends(current_user)):
+    tk = await get_ticket_access(tid, user)
+    msg = {
+        "id": str(uuid.uuid4()), "ticket_id": tid,
+        "sender_id": user["id"], "sender_name": user["name"], "sender_role": user.get("role", "user"),
+        "content": body.content, "at": now_iso(),
+    }
+    await db.ticket_messages.insert_one(msg)
+    updates = {"updated_at": now_iso()}
+    if user.get("role") in STAFF_ROLES and tk["status"] == "waiting":
+        updates["status"] = "in_progress"
+        if not tk.get("assignee_id"):
+            updates["assignee_id"] = user["id"]
+            updates["assignee_name"] = user["name"]
+    await db.tickets.update_one({"id": tid}, {"$set": updates})
+    msg.pop("_id", None)
+    return msg
+
+
+@api.patch("/tickets/{tid}/claim")
+async def claim_ticket(tid: str, staff=Depends(require_staff)):
+    tk = await db.tickets.find_one({"id": tid})
+    if not tk:
+        raise HTTPException(status_code=404, detail="Ticket não encontrado")
+    await db.tickets.update_one({"id": tid}, {"$set": {
+        "assignee_id": staff["id"], "assignee_name": staff["name"],
+        "status": "in_progress", "updated_at": now_iso(),
+    }})
+    return {"ok": True}
+
+
+@api.patch("/tickets/{tid}/status")
+async def set_ticket_status(tid: str, body: TicketStatusIn, user=Depends(current_user)):
+    await get_ticket_access(tid, user)
+    upd = {"status": body.status, "updated_at": now_iso()}
+    if body.status == "resolved":
+        upd["resolved_at"] = now_iso()
+    await db.tickets.update_one({"id": tid}, {"$set": upd})
+    return {"status": body.status}
 
 
 # ---------- Admin: RBAC-protected routes ----------

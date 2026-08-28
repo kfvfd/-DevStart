@@ -36,7 +36,8 @@ User language: Portuguese (pt-BR) — respond in PT.
 - [DONE] Fixed corrupted backend/.env (CORS_ORIGINS/EMERGENT_LLM_KEY were on one line).
 
 ## Backlog / Next
-- P1 Phase 2: Ticket/help system — "Pedir ajuda" from a project step creates a ticket (user, project, step, problem, status: waiting/in-progress/resolved); collaborators/moderators can claim & chat within ticket.
-- P1 Phase 3: AI improvement loop — resolution rating (👍/👎), mark "good example for AI", admin approval → becomes AI knowledge base entry injected into DevMentor context.
+- [DONE 2026-06] P1 Phase 2: Ticket/help system — "Pedir ajuda humana" from a project step creates a ticket (project, step, problem, status waiting/in_progress/resolved); staff (collaborator/moderator/admin) get a Help Center queue with stats, can claim & chat within tickets. Owner-or-staff access enforced server-side. Nav "Ajuda" for all users; role-aware Tickets page.
+- P1 Phase 3: AI improvement loop — resolution rating (up/down), mark "good example for AI", admin approval → becomes AI knowledge base entry injected into DevMentor context.
 - P2: Per-role dashboards/capabilities (tester feedback form, collaborator/moderator queues).
 - P2: Favorites view, project detail polish, i18n coverage for all pages.
+- Tech debt: server.py ~760 lines — split Tickets/Admin/Projects into separate routers.

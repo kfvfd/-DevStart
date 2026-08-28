@@ -12,6 +12,8 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Explore from "./pages/Explore";
 import DevMentor from "./pages/DevMentor";
 import Admin from "./pages/Admin";
+import Tickets from "./pages/Tickets";
+import TicketDetail from "./pages/TicketDetail";
 import { Loader2 } from "lucide-react";
 
 const Protected = ({ children }) => {
@@ -42,6 +44,8 @@ function Shell() {
         <Route path="/projects/:id" element={<Protected><ProjectDetail /></Protected>} />
         <Route path="/explore" element={<Protected><Explore /></Protected>} />
         <Route path="/devmentor" element={<Protected><DevMentor /></Protected>} />
+        <Route path="/tickets" element={<Protected><Tickets /></Protected>} />
+        <Route path="/tickets/:id" element={<Protected><TicketDetail /></Protected>} />
         <Route path="/admin" element={<AdminOnly><Admin /></AdminOnly>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
