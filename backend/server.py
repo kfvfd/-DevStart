@@ -407,15 +407,42 @@ def system_prompt_for(mode: str, language_ui: str) -> str:
     return base
 
 
+async def build_knowledge_context(language=None, framework=None) -> str:
+    items = []
+    if language or framework:
+        or_conds = []
+        if language:
+            or_conds.append({"language": language})
+        if framework:
+            or_conds.append({"framework": framework})
+        items = await db.knowledge.find({"status": "approved", "$or": or_conds}, {"_id": 0}).sort("approved_at", -1).to_list(4)
+    if len(items) < 4:
+        seen = {i["id"] for i in items}
+        extra = await db.knowledge.find({"status": "approved"}, {"_id": 0}).sort("approved_at", -1).to_list(6)
+        for e in extra:
+            if e["id"] not in seen:
+                items.append(e)
+            if len(items) >= 4:
+                break
+    if not items:
+        return ""
+    lines = ["\n\nBase de conhecimento da comunidade (casos reais resolvidos e aprovados por um admin). Use quando for relevante para ajudar o aluno:"]
+    for it in items:
+        lines.append(f"- Problema: {it['problem']}\n  Como foi resolvido: {it['solution'][:600]}")
+    return "\n".join(lines)
+
+
 @api.post("/chat/stream")
 async def chat_stream(body: ChatIn, user=Depends(current_user)):
     model_provider, model_name = ("anthropic", "claude-sonnet-4-6") if body.model == "claude" else ("openai", "gpt-5.4")
     session_id = f"user-{user['id']}-{body.project_id or 'general'}"
 
     context = ""
+    proj_language, proj_framework = None, None
     if body.project_id:
         p = await db.projects.find_one({"id": body.project_id, "user_id": user["id"]}, {"_id": 0})
         if p:
+            proj_language, proj_framework = p.get("language"), p.get("framework")
             context = f"\n\nProjeto atual: {p['name']} ({p['language']}/{p['framework']}). Objetivo: {p['goal']}."
             if body.step_id:
                 for s in p["steps"]:
@@ -423,10 +450,12 @@ async def chat_stream(body: ChatIn, user=Depends(current_user)):
                         context += f"\nEtapa atual: {s['title']}. Código: {s.get('code','')}"
                         break
 
+    knowledge_ctx = await build_knowledge_context(proj_language, proj_framework)
+
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=session_id,
-        system_message=system_prompt_for(body.mode, body.language_ui) + context,
+        system_message=system_prompt_for(body.mode, body.language_ui) + context + knowledge_ctx,
     ).with_model(model_provider, model_name)
 
     # Save user message
@@ -494,6 +523,13 @@ async def get_ticket_access(tid: str, user):
     if tk["user_id"] != user["id"] and user.get("role") not in STAFF_ROLES:
         raise HTTPException(status_code=403, detail="Acesso negado")
     return tk
+
+
+async def create_notification(user_id: str, ntype: str, ticket_id: str, message: str):
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()), "user_id": user_id, "type": ntype,
+        "ticket_id": ticket_id, "message": message, "read": False, "at": now_iso(),
+    })
 
 
 @api.post("/tickets")
@@ -584,6 +620,13 @@ async def post_ticket_message(tid: str, body: TicketMessageIn, user=Depends(curr
             updates["assignee_id"] = user["id"]
             updates["assignee_name"] = user["name"]
     await db.tickets.update_one({"id": tid}, {"$set": updates})
+    # Notify the other participant so they come back to the conversation
+    if user["id"] == tk["user_id"]:
+        recipient = updates.get("assignee_id") or tk.get("assignee_id")
+    else:
+        recipient = tk["user_id"]
+    if recipient and recipient != user["id"]:
+        await create_notification(recipient, "ticket_reply", tid, f"{user['name']} respondeu ao seu ticket")
     msg.pop("_id", None)
     return msg
 
@@ -608,6 +651,86 @@ async def set_ticket_status(tid: str, body: TicketStatusIn, user=Depends(current
         upd["resolved_at"] = now_iso()
     await db.tickets.update_one({"id": tid}, {"$set": upd})
     return {"status": body.status}
+
+
+# ---------- Phase 3: AI improvement loop ----------
+class RatingIn(BaseModel):
+    rating: Literal["up", "down"]
+
+
+@api.patch("/tickets/{tid}/rate")
+async def rate_ticket(tid: str, body: RatingIn, user=Depends(current_user)):
+    tk = await db.tickets.find_one({"id": tid})
+    if not tk:
+        raise HTTPException(status_code=404, detail="Ticket não encontrado")
+    if tk["user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Apenas o autor do ticket pode avaliar")
+    if tk["status"] != "resolved":
+        raise HTTPException(status_code=400, detail="Avalie apenas tickets resolvidos")
+    await db.tickets.update_one({"id": tid}, {"$set": {"rating": body.rating, "updated_at": now_iso()}})
+    return {"rating": body.rating}
+
+
+@api.post("/tickets/{tid}/good-example")
+async def mark_good_example(tid: str, staff=Depends(require_staff)):
+    tk = await db.tickets.find_one({"id": tid}, {"_id": 0})
+    if not tk:
+        raise HTTPException(status_code=404, detail="Ticket não encontrado")
+    existing = await db.knowledge.find_one({"ticket_id": tid}, {"_id": 0})
+    if existing:
+        return existing
+    msgs = await db.ticket_messages.find({"ticket_id": tid}, {"_id": 0}).sort("at", 1).to_list(1000)
+    solution = "\n\n".join(
+        f"{m['sender_name']}: {m['content']}" for m in msgs if m.get("sender_role") in STAFF_ROLES
+    )
+    title = tk.get("step_title") or (tk.get("project_name") or tk["problem"][:60])
+    doc = {
+        "id": str(uuid.uuid4()),
+        "ticket_id": tid,
+        "title": title,
+        "problem": tk["problem"],
+        "solution": solution,
+        "language": None,
+        "framework": None,
+        "status": "pending",
+        "created_by": staff["name"],
+        "approved_by": None,
+        "created_at": now_iso(),
+        "approved_at": None,
+    }
+    if tk.get("project_id"):
+        p = await db.projects.find_one({"id": tk["project_id"]}, {"_id": 0, "language": 1, "framework": 1})
+        if p:
+            doc["language"] = p.get("language")
+            doc["framework"] = p.get("framework")
+    await db.knowledge.insert_one(doc)
+    await db.tickets.update_one({"id": tid}, {"$set": {"good_example": True, "updated_at": now_iso()}})
+    doc.pop("_id", None)
+    return doc
+
+
+# ---------- Notifications ----------
+class NotifReadIn(BaseModel):
+    ids: Optional[List[str]] = None
+
+
+@api.get("/notifications")
+async def list_notifications(user=Depends(current_user)):
+    return await db.notifications.find({"user_id": user["id"]}, {"_id": 0}).sort("at", -1).to_list(50)
+
+
+@api.get("/notifications/unread_count")
+async def unread_count(user=Depends(current_user)):
+    return {"count": await db.notifications.count_documents({"user_id": user["id"], "read": False})}
+
+
+@api.post("/notifications/read")
+async def mark_read(body: NotifReadIn, user=Depends(current_user)):
+    q = {"user_id": user["id"]}
+    if body.ids:
+        q["id"] = {"$in": body.ids}
+    await db.notifications.update_many(q, {"$set": {"read": True}})
+    return {"ok": True}
 
 
 # ---------- Admin: RBAC-protected routes ----------
@@ -700,6 +823,46 @@ async def admin_delete_template(tid: str, admin=Depends(require_admin)):
     res = await db.templates.delete_one({"id": tid})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Template não encontrado")
+    return {"ok": True}
+
+
+# ---------- Admin: AI knowledge base (Phase 3) ----------
+@api.get("/admin/knowledge")
+async def admin_list_knowledge(status_q: Optional[str] = Query(None, alias="status"), admin=Depends(require_admin)):
+    q = {}
+    if status_q:
+        q["status"] = status_q
+    items = await db.knowledge.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return {
+        "items": items,
+        "counts": {
+            "pending": await db.knowledge.count_documents({"status": "pending"}),
+            "approved": await db.knowledge.count_documents({"status": "approved"}),
+        },
+    }
+
+
+@api.patch("/admin/knowledge/{kid}/approve")
+async def admin_approve_knowledge(kid: str, admin=Depends(require_admin)):
+    kn = await db.knowledge.find_one({"id": kid}, {"_id": 0})
+    if not kn:
+        raise HTTPException(status_code=404, detail="Conhecimento não encontrado")
+    await db.knowledge.update_one({"id": kid}, {"$set": {
+        "status": "approved", "approved_by": admin["name"], "approved_at": now_iso(),
+    }})
+    if kn.get("ticket_id"):
+        await db.tickets.update_one({"id": kn["ticket_id"]}, {"$set": {"approved": True}})
+    return {"ok": True, "status": "approved"}
+
+
+@api.delete("/admin/knowledge/{kid}")
+async def admin_delete_knowledge(kid: str, admin=Depends(require_admin)):
+    kn = await db.knowledge.find_one({"id": kid}, {"_id": 0})
+    if not kn:
+        raise HTTPException(status_code=404, detail="Conhecimento não encontrado")
+    await db.knowledge.delete_one({"id": kid})
+    if kn.get("ticket_id"):
+        await db.tickets.update_one({"id": kn["ticket_id"]}, {"$set": {"good_example": False, "approved": False}})
     return {"ok": True}
 
 

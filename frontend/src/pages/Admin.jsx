@@ -17,7 +17,7 @@ import {
 } from "../components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
-  Shield, Users, LayoutTemplate, BarChart3, Trash2, Pencil, Plus, Loader2, Crown,
+  Shield, Users, LayoutTemplate, BarChart3, Trash2, Pencil, Plus, Loader2, Crown, BookOpen, Check,
 } from "lucide-react";
 
 const ROLES = ["user", "tester", "collaborator", "moderator", "admin"];
@@ -303,6 +303,83 @@ function StatsTab({ t }) {
   );
 }
 
+function KnowledgeTab({ t }) {
+  const [data, setData] = useState({ items: [], counts: {} });
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(() => {
+    api.get("/admin/knowledge").then((r) => setData(r.data)).finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const approve = async (id) => {
+    try { await api.patch(`/admin/knowledge/${id}/approve`); toast.success(t("approve")); load(); }
+    catch { toast.error("Erro"); }
+  };
+  const del = async (id) => {
+    try { await api.delete(`/admin/knowledge/${id}`); toast.success(t("delete")); load(); }
+    catch { toast.error("Erro"); }
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-sky-400" /></div>;
+
+  return (
+    <div data-testid="admin-knowledge-tab" className="space-y-4">
+      <div className="flex gap-3 mb-2 text-xs font-mono">
+        <span className="px-3 py-1 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30">{t("pendingTab")}: {data.counts.pending || 0}</span>
+        <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">{t("approvedTab")}: {data.counts.approved || 0}</span>
+      </div>
+      {data.items.length === 0 ? (
+        <div className="p-12 text-center text-slate-500 rounded-2xl bg-slate-900/40 border border-dashed border-white/10">
+          <BookOpen className="w-8 h-8 mx-auto mb-3 opacity-40" />{t("noKnowledge")}
+        </div>
+      ) : data.items.map((k) => (
+        <div key={k.id} data-testid={`knowledge-${k.id}`} className="p-5 rounded-2xl bg-slate-900/60 border border-white/5">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <h3 className="font-semibold">{k.title}</h3>
+            <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-full border flex-shrink-0 ${k.status === "approved" ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-amber-400/15 text-amber-300 border-amber-400/30"}`}>
+              {k.status === "approved" ? t("approvedTab") : t("pendingTab")}
+            </span>
+          </div>
+          <div className="text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">{t("problemLabel")}</div>
+          <p className="text-sm text-slate-300 mb-3">{k.problem}</p>
+          <div className="text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">{t("solutionLabel")}</div>
+          <p className="text-sm text-slate-300 whitespace-pre-wrap mb-4">{k.solution}</p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-xs text-slate-500 font-mono">{t("createdByLabel")}: {k.created_by}{k.language ? ` · ${k.language}` : ""}</span>
+            <div className="flex gap-2">
+              {k.status !== "approved" && (
+                <Button data-testid={`approve-knowledge-${k.id}`} onClick={() => approve(k.id)}
+                  className="rounded-full h-9 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold">
+                  <Check className="w-4 h-4 mr-1.5" />{t("approve")}
+                </Button>
+              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" data-testid={`delete-knowledge-${k.id}`}
+                    className="rounded-full h-9 w-9 text-slate-500 hover:text-red-400 hover:bg-red-500/10">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-slate-900 border-white/10">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("reject")}</AlertDialogTitle>
+                    <AlertDialogDescription className="text-slate-400">{k.title}</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-full bg-white/5 border-white/10 hover:bg-white/10">{t("cancel")}</AlertDialogCancel>
+                    <AlertDialogAction data-testid={`confirm-delete-knowledge-${k.id}`} onClick={() => del(k.id)}
+                      className="rounded-full bg-red-500 hover:bg-red-400 text-white">{t("confirm")}</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Admin() {
   const { t, user } = useApp();
 
@@ -329,10 +406,14 @@ export default function Admin() {
           <TabsTrigger value="templates" data-testid="tab-templates" className="rounded-full data-[state=active]:bg-sky-500 data-[state=active]:text-slate-950 gap-2">
             <LayoutTemplate className="w-4 h-4" /> {t("templatesTab")}
           </TabsTrigger>
+          <TabsTrigger value="knowledge" data-testid="tab-knowledge" className="rounded-full data-[state=active]:bg-sky-500 data-[state=active]:text-slate-950 gap-2">
+            <BookOpen className="w-4 h-4" /> {t("knowledgeTab")}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="stats"><StatsTab t={t} /></TabsContent>
         <TabsContent value="users"><UsersTab t={t} currentUser={user} /></TabsContent>
         <TabsContent value="templates"><TemplatesTab t={t} /></TabsContent>
+        <TabsContent value="knowledge"><KnowledgeTab t={t} /></TabsContent>
       </Tabs>
     </div>
   );

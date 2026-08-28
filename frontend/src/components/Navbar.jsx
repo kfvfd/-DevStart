@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { Button } from "./ui/button";
+import NotificationBell from "./NotificationBell";
 import { Code2, LayoutDashboard, Sparkles, LogOut, MessageCircleQuestion, Shield, LifeBuoy } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem
@@ -50,6 +51,7 @@ export default function Navbar() {
         )}
 
         <div className="flex items-center gap-2">
+          {user && <NotificationBell />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" data-testid="lang-switcher" className="rounded-full text-xs font-mono h-9 px-3 hover:bg-white/5">

@@ -37,7 +37,8 @@ User language: Portuguese (pt-BR) — respond in PT.
 
 ## Backlog / Next
 - [DONE 2026-06] P1 Phase 2: Ticket/help system — "Pedir ajuda humana" from a project step creates a ticket (project, step, problem, status waiting/in_progress/resolved); staff (collaborator/moderator/admin) get a Help Center queue with stats, can claim & chat within tickets. Owner-or-staff access enforced server-side. Nav "Ajuda" for all users; role-aware Tickets page.
-- P1 Phase 3: AI improvement loop — resolution rating (up/down), mark "good example for AI", admin approval → becomes AI knowledge base entry injected into DevMentor context.
-- P2: Per-role dashboards/capabilities (tester feedback form, collaborator/moderator queues).
-- P2: Favorites view, project detail polish, i18n coverage for all pages.
-- Tech debt: server.py ~760 lines — split Tickets/Admin/Projects into separate routers.
+- [DONE 2026-06] Notifications: replying to a ticket notifies the other participant (owner<->assignee); navbar bell (NotificationBell) with unread badge, dropdown, mark-all-read; polls + refetch on focus/visibility. Endpoints: GET /notifications, GET /notifications/unread_count, POST /notifications/read.
+- [DONE 2026-06] P1 Phase 3: AI improvement loop — owner rates resolved ticket 👍/👎 (PATCH /tickets/{id}/rate, owner+resolved only); staff mark "bom exemplo para a IA" (POST /tickets/{id}/good-example, creates pending knowledge from staff messages); admin "Conhecimento IA" tab approves/deletes (GET/PATCH approve/DELETE /admin/knowledge); approved knowledge injected into DevMentor chat system prompt via build_knowledge_context.
+- P2: Per-role dashboards/capabilities (tester feedback form; moderator content-review queue).
+- P2: Favorites view, project detail polish, full i18n coverage.
+- Tech debt: server.py ~923 lines — split into routers (auth/projects/chat/tickets/notifications/admin). Notifications need pagination + TTL cleanup. Consider limiting knowledge injection to context-matched sessions.

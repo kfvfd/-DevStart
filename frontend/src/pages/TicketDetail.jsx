@@ -5,7 +5,7 @@ import { useApp } from "../context/AppContext";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Send, CheckCircle2, Hand, RotateCcw, Shield } from "lucide-react";
+import { ArrowLeft, Loader2, Send, CheckCircle2, Hand, RotateCcw, Shield, ThumbsUp, ThumbsDown, Sparkles, BadgeCheck } from "lucide-react";
 
 const STAFF = ["admin", "moderator", "collaborator"];
 const STATUS = {
@@ -56,10 +56,13 @@ export default function TicketDetail() {
 
   const claim = async () => { await api.patch(`/tickets/${id}/claim`); await load(); toast.success(t("statusInProgress")); };
   const setStatus = async (s) => { await api.patch(`/tickets/${id}/status`, { status: s }); await load(); };
+  const rate = async (r) => { await api.patch(`/tickets/${id}/rate`, { rating: r }); await load(); toast.success(t("ratedThanks")); };
+  const goodExample = async () => { await api.post(`/tickets/${id}/good-example`); await load(); toast.success(t("sentForReview")); };
 
   if (loading || !data) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-sky-400" /></div>;
   const tk = data.ticket;
   const st = STATUS[tk.status] || STATUS.waiting;
+  const isOwner = tk.user_id === user?.id;
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-6 animate-fade-slide" data-testid="ticket-detail">
@@ -93,6 +96,42 @@ export default function TicketDetail() {
           </Button>
         )}
       </div>
+
+      {tk.status === "resolved" && (isOwner || isStaff) && (
+        <div data-testid="ticket-feedback" className="p-5 rounded-2xl bg-slate-900/60 border border-white/5 mb-6 space-y-4">
+          {isOwner && (
+            tk.rating ? (
+              <p className="text-sm text-emerald-300 flex items-center gap-2"><BadgeCheck className="w-4 h-4" /> {t("ratedThanks")} {tk.rating === "up" ? "👍" : "👎"}</p>
+            ) : (
+              <div>
+                <p className="text-sm text-slate-200 mb-3">{t("helpfulQuestion")}</p>
+                <div className="flex gap-2">
+                  <Button data-testid="rate-up" onClick={() => rate("up")}
+                    className="rounded-full bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30">
+                    <ThumbsUp className="w-4 h-4 mr-1.5" /> {t("rateYes")}
+                  </Button>
+                  <Button data-testid="rate-down" onClick={() => rate("down")}
+                    className="rounded-full bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/30">
+                    <ThumbsDown className="w-4 h-4 mr-1.5" /> {t("rateNo")}
+                  </Button>
+                </div>
+              </div>
+            )
+          )}
+          {isStaff && (
+            tk.good_example ? (
+              <p className="text-sm text-fuchsia-300 flex items-center gap-2">
+                <Sparkles className="w-4 h-4" /> {tk.approved ? t("approvedForAI") : t("sentForReview")}
+              </p>
+            ) : (
+              <Button data-testid="good-example-btn" onClick={goodExample}
+                className="rounded-full bg-fuchsia-500/15 text-fuchsia-300 hover:bg-fuchsia-500/25 border border-fuchsia-500/30">
+                <Sparkles className="w-4 h-4 mr-1.5" /> {t("goodExample")}
+              </Button>
+            )
+          )}
+        </div>
+      )}
 
       <div className="space-y-4 mb-6">
         {data.messages.map((m) => {
