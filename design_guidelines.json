@@ -1,0 +1,150 @@
+{
+  "theme": "dark",
+  "typography": {
+    "fonts": {
+      "heading": "Outfit",
+      "body": "Outfit",
+      "mono": "JetBrains Mono"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-bold",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-semibold",
+      "h3": "text-xl sm:text-2xl font-medium",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base text-slate-300 leading-relaxed",
+      "small": "text-sm text-slate-400",
+      "overline": "text-xs font-mono uppercase tracking-[0.2em] text-cyan-400"
+    },
+    "guidelines": [
+      "DO NOT use Inter, Roboto, Open Sans, or Lato for Headings.",
+      "Use Outfit for both headings and body to create a modern, friendly tech vibe.",
+      "Use JetBrains Mono for code snippets, tags, overlines, and technical metadata.",
+      "Never default to Bold for all headings; use variable weights (e.g., light or black) to create tension."
+    ]
+  },
+  "colors": {
+    "palette_name": "Electric & Neon (Gamified Dark Mode)",
+    "base": {
+      "background": "#020617",
+      "surface": "#0f172a",
+      "elevated": "#1e293b"
+    },
+    "accents": {
+      "primary": "#1cb0f6",
+      "success": "#58cc02",
+      "warning": "#ffc800",
+      "error": "#ff4b4b",
+      "premium_ai": "#ce82ff"
+    },
+    "text": {
+      "main": "#f8fafc",
+      "muted": "#94a3b8"
+    },
+    "guidelines": [
+      "Use True Grey Base (#020617 or #0f172a) rather than pure black.",
+      "Implement Layered Elevation: lighten background colors for nested elements rather than using shadows.",
+      "Use vibrant accents sparingly but effectively for gamification signals (XP, progress, AI feedback).",
+      "Avoid default Tailwind SaaS blue; use the defined Sky Blue or Neon Purple.",
+      "Ensure text has at least 4.5:1 contrast against dark backgrounds."
+    ]
+  },
+  "visual_enhancers": {
+    "surfaces": [
+      "Glassmorphism: Use for sticky headers and floating navs (`bg-slate-950/70 backdrop-blur-xl border-b border-white/10`). NEVER use pure transparent backgrounds.",
+      "Retro-Futurism: For code blocks and AI mentor chat bubbles, use subtle drop shadows on borders (`drop-shadow-[0_0_8px_rgba(206,130,255,0.3)]`).",
+      "Cards: Flat background (`bg-slate-900`), 1px subtle border (`border-white/5`), no shadow. On hover: slight lift (`-translate-y-1`), border color brightens (`border-white/20`)."
+    ],
+    "guidelines": [
+      "No full-screen gradients. Use solid dark backgrounds with radial washes (`bg-white/5` with blur) for depth.",
+      "Add 1px inner stroke to glass panels to separate them from the background."
+    ]
+  },
+  "layouts": {
+    "general": [
+      "Mobile-First: Always start with `grid-cols-1`.",
+      "Spacing: Generous. Use `p-6`, `p-8`, or `p-12`. Containers with borders MUST have internal padding.",
+      "Alignment: Left-align dense content and forms. Center-align hero headings only if it improves balance."
+    ],
+    "dashboard": "High Density Grid (grid-cols-1 md:grid-cols-3 lg:grid-cols-4). Tight gaps (gap-4 or gap-6). Use h-full on children.",
+    "learning_path": "Split layout: 1/3 sidebar (progress & steps), 2/3 main content (code & explanations)."
+  },
+  "grids": {
+    "bento_protocol": "For dashboard stats: The Summary (col-span-1), The Main Chart/Activity (col-span-2 row-span-2). Ensure every pixel is utilized."
+  },
+  "components": {
+    "forms": "Use Shadcn `Input`, `Select`, `Form`. Never use native inputs. Strip 'Vercel-look' to match gamified brand.",
+    "buttons": "Pill-shaped (`rounded-full`) or smooth rounded (`rounded-xl`). High interaction animations. Primary CTAs use solid vibrant colors; secondary use `bg-white/5` with vibrant text.",
+    "icons": "Use `lucide-react` for standard UI, `iconoir-react` to break corporate look if needed."
+  },
+  "motion": {
+    "guidelines": [
+      "Hover states on all interactive elements (MUST explicitly set text color on hover, e.g., `hover:bg-slate-800 hover:text-white`).",
+      "Micro-animations for gamification: slight scale on success, shake on error.",
+      "Do NOT use `transition: all`. Specify properties (e.g., `transition-transform duration-200 ease-out`).",
+      "Respect `prefers-reduced-motion`."
+    ]
+  },
+  "accessibility": {
+    "guidelines": [
+      "Focus States: Must have higher contrast than default state (e.g., `focus:ring-2 focus:ring-cyan-400`).",
+      "All interactive elements MUST include `data-testid` (e.g., `data-testid=\"start-project-button\"`).",
+      "Maintain WCAG AA contrast for text."
+    ]
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1759661881353-5b9cc55e1cf4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwzfHxkZXZlbG9wZXIlMjBzZXR1cCUyMGRhcmslMjByb29tfGVufDB8fHx8MTc4NzkzMjcyNXww&ixlib=rb-4.1.0&q=85",
+        "category": "Hero / Dashboard Banner",
+        "description": "Computer screen displaying lines of code, perfect for a subtle hero background or project banner."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1719400471588-575b23e27bd7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwyfHxkZXZlbG9wZXIlMjBzZXR1cCUyMGRhcmslMjByb29tfGVufDB8fHx8MTc4NzkzMjcyNXww&ixlib=rb-4.1.0&q=85",
+        "category": "Community / Mentorship",
+        "description": "A developer in front of monitors, great for the DevMentor AI or 'Need Help' sections."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1518773553398-650c184e0bb3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1Mjh8MHwxfHNlYXJjaHwyfHxjb2RpbmclMjBhYnN0cmFjdCUyMGRhcmt8ZW58MHx8fHwxNzg3OTMyNzI1fDA&ixlib=rb-4.1.0&q=85",
+        "category": "Project Thumbnails",
+        "description": "Turned on monitor displaying programming language, ideal for placeholder project covers."
+      }
+    ]
+  },
+  "3d_libraries": {
+    "recommendation": "Use minimal atmospherics for the learning path to keep focus. TSParticles for subtle floating 'code dust' in the background of the DevMentor chat can add depth without distraction. Do not over-use 3D on text-heavy learning pages."
+  },
+  "instructions_to_main_agent": [
+    "Implement DevStart using a dark-first gamified UI. The platform is for absolute beginners, so spacing must be highly generous to reduce cognitive load.",
+    "Use Shadcn UI extensively but customize the styling to remove the default Vercel aesthetic. Make it look like a friendly, vibrant developer tool.",
+    "Implement the Multi-Language feature structure early (PT/EN/ES). You can mock the translations but build the toggle.",
+    "The step-by-step project learning page should feel like an interactive game level: clear objective, code snippet, and action buttons ('Complete', 'Need Help').",
+    "Integrate the DevMentor AI as a floating assistant or sidebar during project steps.",
+    "Do NOT create `.tsx` files. Use `.js` or `.jsx` as requested.",
+    "Do NOT use transparent backgrounds for dropdowns or stick headers; always use a blur + semi-solid dark color."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition (e.g., `transition: all`). Always add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container, i.e., do not add `.App { text-align: center; }` in the CSS file.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like robot, brain, lightbulb, etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations separate good from extraordinary.",
+    "Main agent relies on the provided image URLs. Missing categories = main agent will use placeholder text which is FORBIDDEN.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Create new components that match the style and conventions of existing components when needed.",
+    "Use `sonner` for toasts. Sonner component are located in `/app/src/components/ui/sonner.js` or similar."
+  ],
+  "GENERAL UI UX DESIGN GUIDELINES": [
+    "Design isn't universal - strategy starts and ends with context. For a learning platform, clarity and emotion are key.",
+    "Emotion First: Every design decision maps to a feeling. Here: 'Empowerment, focus, and tech-savvy'.",
+    "Negative Space: Value the empty areas; they give breathing room and spotlight what truly matters. Essential for beginners to avoid overwhelming them.",
+    "Contrast: Use light vs. dark, big vs. small. Deep dark backgrounds with vibrant neon accents.",
+    "All interactive and key informational elements MUST include a `data-testid` attribute to facilitate robust automated testing."
+  ]
+}
