@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useApp } from "../context/AppContext";
 import { Button } from "../components/ui/button";
@@ -17,8 +18,14 @@ import {
 } from "../components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
-  Shield, Users, LayoutTemplate, BarChart3, Trash2, Pencil, Plus, Loader2, Crown, BookOpen, Check,
+  Shield, Users, LayoutTemplate, BarChart3, Trash2, Pencil, Plus, Loader2, Crown, BookOpen, Check, LifeBuoy, Clock, ExternalLink,
 } from "lucide-react";
+
+const TICKET_STATUS = {
+  waiting: { key: "statusWaiting", cls: "bg-amber-400/15 text-amber-300 border-amber-400/30", dot: "bg-amber-400" },
+  in_progress: { key: "statusInProgress", cls: "bg-sky-500/15 text-sky-300 border-sky-500/30", dot: "bg-sky-400" },
+  resolved: { key: "statusResolved", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", dot: "bg-emerald-400" },
+};
 
 const ROLES = ["user", "tester", "collaborator", "moderator", "admin"];
 const ROLE_STYLE = {
@@ -340,6 +347,13 @@ function KnowledgeTab({ t }) {
               {k.status === "approved" ? t("approvedTab") : t("pendingTab")}
             </span>
           </div>
+          {k.reviewed && k.status !== "approved" && (
+            <div className="mb-3">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-full border bg-sky-500/15 text-sky-300 border-sky-500/30">
+                <Check className="w-3 h-3" /> {t("reviewedLabel")}{k.reviewed_by ? ` · ${k.reviewed_by}` : ""}
+              </span>
+            </div>
+          )}
           <div className="text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">{t("problemLabel")}</div>
           <p className="text-sm text-slate-300 mb-3">{k.problem}</p>
           <div className="text-xs font-mono uppercase tracking-widest text-slate-500 mb-1">{t("solutionLabel")}</div>
@@ -380,6 +394,55 @@ function KnowledgeTab({ t }) {
   );
 }
 
+function AdminTicketsTab({ t }) {
+  const [stats, setStats] = useState(null);
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    api.get("/tickets/stats").then((r) => setStats(r.data));
+    api.get("/tickets").then((r) => setItems(r.data));
+  }, []);
+  if (!stats || !items) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-sky-400" /></div>;
+  return (
+    <div data-testid="admin-tickets-tab" className="space-y-8">
+      <div className="grid grid-cols-3 gap-4">
+        <StatCard testid="admin-ticket-waiting" icon={Clock} label={t("statusWaiting")} value={stats.waiting} accent="bg-amber-400/15 text-amber-300" />
+        <StatCard testid="admin-ticket-progress" icon={LifeBuoy} label={t("statusInProgress")} value={stats.in_progress} accent="bg-sky-500/15 text-sky-300" />
+        <StatCard testid="admin-ticket-resolved" icon={Check} label={t("statusResolved")} value={stats.resolved} accent="bg-emerald-500/15 text-emerald-300" />
+      </div>
+      <div>
+        <h3 className="text-sm font-medium mb-4">{t("allTickets")}</h3>
+        {items.length === 0 ? (
+          <div className="p-12 text-center text-slate-500 rounded-2xl bg-slate-900/40 border border-dashed border-white/10">{t("noTickets")}</div>
+        ) : (
+          <div className="space-y-3">
+            {items.map((tk) => {
+              const s = TICKET_STATUS[tk.status] || TICKET_STATUS.waiting;
+              return (
+                <Link key={tk.id} to={`/tickets/${tk.id}`} data-testid={`admin-ticket-row-${tk.id}`}
+                  className="block p-4 rounded-2xl bg-slate-900/60 border border-white/5 card-hover">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-full border ${s.cls}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{t(s.key)}
+                        </span>
+                        {tk.project_name && <span className="text-xs font-mono text-slate-500 truncate">{tk.project_name}</span>}
+                      </div>
+                      <p className="text-slate-200 line-clamp-1">{tk.problem}</p>
+                      <div className="text-xs text-slate-500 mt-1 font-mono">{tk.user_name} · {tk.assignee_name ? `${t("assignedTo")}: ${tk.assignee_name}` : t("unassigned")}</div>
+                    </div>
+                    <span className="text-xs text-sky-400 flex items-center gap-1 flex-shrink-0"><ExternalLink className="w-3.5 h-3.5" />{t("openTicket")}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const { t, user } = useApp();
 
@@ -409,11 +472,15 @@ export default function Admin() {
           <TabsTrigger value="knowledge" data-testid="tab-knowledge" className="rounded-full data-[state=active]:bg-sky-500 data-[state=active]:text-slate-950 gap-2">
             <BookOpen className="w-4 h-4" /> {t("knowledgeTab")}
           </TabsTrigger>
+          <TabsTrigger value="tickets" data-testid="tab-admin-tickets" className="rounded-full data-[state=active]:bg-sky-500 data-[state=active]:text-slate-950 gap-2">
+            <LifeBuoy className="w-4 h-4" /> {t("ticketsAdminTab")}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="stats"><StatsTab t={t} /></TabsContent>
         <TabsContent value="users"><UsersTab t={t} currentUser={user} /></TabsContent>
         <TabsContent value="templates"><TemplatesTab t={t} /></TabsContent>
         <TabsContent value="knowledge"><KnowledgeTab t={t} /></TabsContent>
+        <TabsContent value="tickets"><AdminTicketsTab t={t} /></TabsContent>
       </Tabs>
     </div>
   );

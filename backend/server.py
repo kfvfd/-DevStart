@@ -86,6 +86,7 @@ def require_role(*allowed_roles: str):
 
 require_admin = require_role("admin")
 require_staff = require_role("admin", "moderator", "collaborator")
+require_mod = require_role("admin", "moderator")
 
 
 # ---------- Models ----------
@@ -697,6 +698,9 @@ async def mark_good_example(tid: str, staff=Depends(require_staff)):
         "approved_by": None,
         "created_at": now_iso(),
         "approved_at": None,
+        "reviewed": False,
+        "reviewed_by": None,
+        "reviewed_at": None,
     }
     if tk.get("project_id"):
         p = await db.projects.find_one({"id": tk["project_id"]}, {"_id": 0, "language": 1, "framework": 1})
@@ -857,6 +861,48 @@ async def admin_approve_knowledge(kid: str, admin=Depends(require_admin)):
 
 @api.delete("/admin/knowledge/{kid}")
 async def admin_delete_knowledge(kid: str, admin=Depends(require_admin)):
+    kn = await db.knowledge.find_one({"id": kid}, {"_id": 0})
+    if not kn:
+        raise HTTPException(status_code=404, detail="Conhecimento não encontrado")
+    await db.knowledge.delete_one({"id": kid})
+    if kn.get("ticket_id"):
+        await db.tickets.update_one({"id": kn["ticket_id"]}, {"$set": {"good_example": False, "approved": False}})
+    return {"ok": True}
+
+
+# ---------- Moderation: community content review queue (moderator + admin) ----------
+@api.get("/moderation/knowledge")
+async def mod_list_knowledge(status_q: Optional[str] = Query(None, alias="status"), mod=Depends(require_mod)):
+    q = {}
+    if status_q:
+        q["status"] = status_q
+    items = await db.knowledge.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return {
+        "items": items,
+        "counts": {
+            "pending": await db.knowledge.count_documents({"status": "pending"}),
+            "reviewed": await db.knowledge.count_documents({"status": "pending", "reviewed": True}),
+            "approved": await db.knowledge.count_documents({"status": "approved"}),
+        },
+    }
+
+
+@api.patch("/moderation/knowledge/{kid}/review")
+async def mod_review_knowledge(kid: str, mod=Depends(require_mod)):
+    kn = await db.knowledge.find_one({"id": kid})
+    if not kn:
+        raise HTTPException(status_code=404, detail="Conhecimento não encontrado")
+    reviewed = not kn.get("reviewed", False)
+    await db.knowledge.update_one({"id": kid}, {"$set": {
+        "reviewed": reviewed,
+        "reviewed_by": mod["name"] if reviewed else None,
+        "reviewed_at": now_iso() if reviewed else None,
+    }})
+    return {"ok": True, "reviewed": reviewed}
+
+
+@api.delete("/moderation/knowledge/{kid}")
+async def mod_reject_knowledge(kid: str, mod=Depends(require_mod)):
     kn = await db.knowledge.find_one({"id": kid}, {"_id": 0})
     if not kn:
         raise HTTPException(status_code=404, detail="Conhecimento não encontrado")

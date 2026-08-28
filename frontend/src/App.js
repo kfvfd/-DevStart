@@ -14,6 +14,7 @@ import DevMentor from "./pages/DevMentor";
 import Admin from "./pages/Admin";
 import Tickets from "./pages/Tickets";
 import TicketDetail from "./pages/TicketDetail";
+import Moderation from "./pages/Moderation";
 import { Loader2 } from "lucide-react";
 
 const Protected = ({ children }) => {
@@ -28,6 +29,14 @@ const AdminOnly = ({ children }) => {
   if (loading) return <div className="flex items-center justify-center h-screen"><Loader2 className="w-6 h-6 animate-spin text-sky-400" /></div>;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== "admin") return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
+const ModOnly = ({ children }) => {
+  const { user, loading } = useApp();
+  if (loading) return <div className="flex items-center justify-center h-screen"><Loader2 className="w-6 h-6 animate-spin text-sky-400" /></div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!["admin", "moderator"].includes(user.role)) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -46,6 +55,7 @@ function Shell() {
         <Route path="/devmentor" element={<Protected><DevMentor /></Protected>} />
         <Route path="/tickets" element={<Protected><Tickets /></Protected>} />
         <Route path="/tickets/:id" element={<Protected><TicketDetail /></Protected>} />
+        <Route path="/moderation" element={<ModOnly><Moderation /></ModOnly>} />
         <Route path="/admin" element={<AdminOnly><Admin /></AdminOnly>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
